@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>فروشگاه کفش شهاب - پخش عمده و خرده کفش</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Vazirmatn Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Vazirmatn', sans-serif;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col selection:bg-indigo-600 selection:text-white">
+
+    <!-- App State & Firebase Setup -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'shahab-shoe-store-default';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            apiKey: "AIzaSyDummyKeyForPreviewModeOnly12345",
+            authDomain: "dummy-app.firebaseapp.com",
+            projectId: "dummy-app",
+            storageBucket: "dummy-app.appspot.com",
+            messagingSenderId: "123456789",
+            appId: appId
+        };
+
+        let app, db, auth;
+        try {
+            app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+        } catch (e) {
+            console.warn("Firebase init warning:", e);
+        }
+
+        const ADMIN_PHONES = ['09177692545', '09902418177'];
+
+        window. ShahabApp = {
+            appId,
+            db,
+            auth,
+            ADMIN_PHONES,
+            currentUser: null,
+            currentRole: 'user',
+            products: [],
+            users: []
+        };
+    </script>
+
+    <!-- Auth Modal / Screen -->
+    <div id="authModal" class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 border border-slate-100 relative overflow-hidden transform transition-all">
+            <div class="absolute -top-12 -left-12 w-40 h-40 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
+            
+            <div class="text-center mb-8">
+                <div class="w-16 h-16 bg-gradient-to-tr from-indigo-600 to-violet-600 text-white rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 shadow-xl shadow-indigo-500/25">
+                    <i class="fa-solid fa-shoe-prints"></i>
+                </div>
+                <h1 class="text-2xl font-black text-slate-900 tracking-tight">کفش شهاب</h1>
+                <p class="text-xs text-slate-500 mt-1">پخش عمده و خرده کفش بچه‌گانه، اسپرت و مجلسی</p>
+            </div>
+
+            <form id="authForm" onsubmit="handleAuthSubmit(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5">نام و نام خانوادگی</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400">
+                            <i class="fa-solid fa-user"></i>
+                        </span>
+                        <input type="text" id="authName" required placeholder="مثلاً: علی رضایی" 
+                            class="w-full pr-10 pl-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:bg-white transition-all">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5">شماره تلفن همراه</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400">
+                            <i class="fa-solid fa-phone"></i>
+                        </span>
+                        <input type="tel" id="authPhone" required placeholder="09123456789" pattern="^09[0-9]{9}$" title="لطفاً شماره موبایل معتبر ۱۱ رقمی با 09 وارد کنید"
+                            class="w-full pr-10 pl-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:bg-white transition-all text-left dir-ltr">
+                    </div>
+                    <p class="text-[10px] text-slate-400 mt-1">مثال: 09177692545 (مدیران با شماره‌های مخصوص به صورت خودکار شناسایی می‌شوند)</p>
+                </div>
+
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-3.5 rounded-xl shadow-lg shadow-indigo-600/30 transition-all text-sm flex items-center justify-center gap-2">
+                    <span>ورود به فروشگاه</span>
+                    <i class="fa-solid fa-arrow-left"></i>
+                </button>
+            </form>
+
+            <div class="mt-6 text-center border-t border-slate-100 pt-4">
+                <p class="text-[11px] text-slate-400">با ورود به سایت، قوانین و مقررات فروشگاه کفش شهاب را می‌پذیرید.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App Container (Hidden until login) -->
+    <div id="mainApp" class="hidden flex-col min-h-screen">
+        <!-- Header -->
+        <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
+                <!-- Logo & Brand -->
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 bg-indigo-600 text-white rounded-2xl flex items-center justify-center text-xl shadow-md shadow-indigo-500/20">
+                        <i class="fa-solid fa-shoe-prints"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-extrabold text-xl text-slate-800 tracking-tight">کفش شهاب</h1>
+                        <p class="text-xs text-slate-500">پخش عمده و خرده کفش بچه‌گانه، اسپرت و مجلسی</p>
+                    </div>
+                </div>
+
+                <!-- Actions / User Info -->
+                <div class="flex items-center gap-3">
+                    <div id="adminBadgeContainer"></div>
+                    <div class="hidden sm:flex flex-col text-left bg-slate-50 px-4 py-2 rounded-2xl border border-slate-200">
+                        <span id="headerUserName" class="text-xs font-bold text-slate-800">کاربر مهمان</span>
+                        <span id="headerUserRole" class="text-[10px] text-indigo-600 font-semibold">مشتری</span>
+                    </div>
+                    <button onclick="openCallModal()" class="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-4 py-2.5 rounded-xl font-bold text-xs transition-colors flex items-center gap-2 border border-emerald-200">
+                        <i class="fa-solid fa-phone"></i>
+                        <span class="hidden md:inline">تماس با پشتیبانی</span>
+                    </button>
+                    <button onclick="logoutUser()" class="bg-rose-50 text-rose-600 hover:bg-rose-100 p-2.5 rounded-xl text-sm transition-colors" title="خروج از حساب">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Hero Banner & Store Info Bar -->
+        <section class="bg-gradient-to-br from-indigo-900 via-indigo-800 to-slate-900 text-white py-12 px-4 shadow-xl relative overflow-hidden">
+            <div class="absolute inset-0 opacity-10 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px]"></div>
+            <div class="max-w-7xl mx-auto relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
+                <div class="max-w-2xl text-center md:text-right">
+                    <span class="bg-indigo-500/30 text-indigo-200 border border-indigo-400/30 text-xs px-3.5 py-1.5 rounded-full font-semibold inline-block mb-4">
+                        <i class="fa-solid fa-star text-amber-400 ml-1"></i> پخش سراسری قشم و درگهان
+                    </span>
+                    <h2 class="text-3xl md:text-4xl font-black mb-4 tracking-tight leading-tight">خرید عمده و خرده انواع کفش با بهترین قیمت بازار</h2>
+                    <p class="text-indigo-200 text-sm md:text-base leading-relaxed mb-6">
+                        عرضه مستقیم و بدون واسطه انواع کفش‌های بچه‌گانه، اسپرت، مجلسی و صندل با کیفیت عالی و قیمت رقابتی.
+                    </p>
+                    <div class="flex flex-wrap items-center justify-center md:justify-start gap-4 text-xs md:text-sm text-indigo-100">
+                        <div class="bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-xl border border-white/10 flex items-center gap-2">
+                            <i class="fa-solid fa-location-dot text-amber-400"></i>
+                            <span>قشم، درگهان، بازار قدیم، پشت بانک ملی، دالان ۸، پلاک ۵۳۳</span>
+                        </div>
+                        <a href="tel:09177692545" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2.5 rounded-xl transition-colors flex items-center gap-2 shadow-lg">
+                            <i class="fa-solid fa-phone"></i> ۰۹۱۷۷۶۹۲۵۴۵
+                        </a>
+                    </div>
+                </div>
+                <div class="w-full md:w-auto flex justify-center">
+                    <div class="bg-white/10 backdrop-blur-xl p-6 rounded-3xl border border-white/20 shadow-2xl max-w-sm w-full text-center">
+                        <div class="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl text-amber-400">
+                            <i class="fa-solid fa-store"></i>
+                        </div>
+                        <h4 class="font-extrabold text-lg mb-1">فروشگاه کفش شهاب</h4>
+                        <p class="text-xs text-indigo-200 mb-4">آماده همکاری با بنکداران و فروشگاه‌داران سراسر کشور</p>
+                        <button onclick="document.getElementById('productsSection').scrollIntoView({behavior: 'smooth'})" class="w-full bg-white text-indigo-900 hover:bg-indigo-50 font-extrabold py-3 rounded-xl text-sm transition-colors shadow-md">
+                            مشاهده محصولات
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Admin Panel Section (Only visible to Admin) -->
+        <section id="adminPanelSection" class="hidden bg-indigo-50/70 border-b border-indigo-100 py-8 px-4">
+            <div class="max-w-7xl mx-auto">
+                <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
+                    <div>
+                        <span class="bg-indigo-600 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">پنل مدیریت اختصاصی</span>
+                        <h3 class="text-xl font-black text-indigo-950 mt-1">مدیریت محصولات و موجودی فروشگاه</h3>
+                    </div>
+                    <button onclick="openProductModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-5 py-3 rounded-xl shadow-lg shadow-indigo-600/30 text-sm flex items-center gap-2 transition-all">
+                        <i class="fa-solid fa-plus-circle text-lg"></i>
+                        <span>افزودن محصول جدید</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Products Catalog Section -->
+        <section id="productsSection" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 flex-grow w-full">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4 mb-8">
+                <div>
+                    <h3 class="text-2xl font-black text-slate-900 tracking-tight">لیست محصولات فروشگاه</h3>
+                    <p class="text-xs text-slate-500 mt-1">جدیدترین مدل‌های کفش عمده و خرده با تنوع بالا</p>
+                </div>
+
+                <!-- Search & Filters -->
+                <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                    <div class="relative flex-grow md:w-72">
+                        <span class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400">
+                            <i class="fa-solid fa-search"></i>
+                        </span>
+                        <input type="text" id="searchInput" oninput="filterProducts()" placeholder="جستجوی نام یا مدل کفش..." 
+                            class="w-full pr-10 pl-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600 shadow-sm">
+                    </div>
+
+                    <div class="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0">
+                        <button onclick="filterByCategory('all')" id="cat_all" class="category-btn bg-indigo-600 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-sm transition-all whitespace-nowrap">همه</button>
+                        <button onclick="filterByCategory('بچه‌گانه')" id="cat_بچه‌گانه" class="category-btn bg-white text-slate-600 hover:bg-slate-100 text-xs font-bold px-4 py-2.5 rounded-xl border border-slate-200 transition-all whitespace-nowrap">بچه‌گانه</button>
+                        <button onclick="filterByCategory('اسپرت')" id="cat_اسپرت" class="category-btn bg-white text-slate-600 hover:bg-slate-100 text-xs font-bold px-4 py-2.5 rounded-xl border border-slate-200 transition-all whitespace-nowrap">اسپرت</button>
+                        <button onclick="filterByCategory('مجلسی')" id="cat_مجلسی" class="category-btn bg-white text-slate-600 hover:bg-slate-100 text-xs font-bold px-4 py-2.5 rounded-xl border border-slate-200 transition-all whitespace-nowrap">مجلسی</button>
+                        <button onclick="filterByCategory('زنانه')" id="cat_زنانه" class="category-btn bg-white text-slate-600 hover:bg-slate-100 text-xs font-bold px-4 py-2.5 rounded-xl border border-slate-200 transition-all whitespace-nowrap">زنانه</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Product Grid -->
+            <div id="productsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Dynamically populated -->
+            </div>
+
+            <!-- Empty State -->
+            <div id="emptyState" class="hidden text-center py-16 bg-white rounded-3xl border border-slate-200 shadow-sm mt-4">
+                <div class="w-16 h-16 bg-slate-100 text-slate-400 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-4">
+                    <i class="fa-solid fa-box-open"></i>
+                </div>
+                <h4 class="font-bold text-slate-700 text-lg">محصولی یافت نشد</h4>
+                <p class="text-xs text-slate-400 mt-1">محصولی با این مشخصات در فروشگاه موجود نیست.</p>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="bg-slate-900 text-white border-t border-slate-800 mt-auto py-12 px-4">
+            <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+                <div>
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center text-lg shadow">
+                            <i class="fa-solid fa-shoe-prints"></i>
+                        </div>
+                        <h4 class="font-extrabold text-lg">فروشگاه کفش شهاب</h4>
+                    </div>
+                    <p class="text-xs text-slate-400 leading-relaxed">
+                        مرکز پخش عمده و خرده انواع کفش‌های بچه‌گانه، مردانه، زنانه، اسپرت و مجلسی با ارسال سریع به سراسر کشور از جزیره قشم (درگهان).
+                    </p>
+                </div>
+                <div>
+                    <h4 class="font-bold text-sm mb-4 text-indigo-400">اطلاعات تماس</h4>
+                    <ul class="space-y-2 text-xs text-slate-300">
+                        <li class="flex items-center gap-2">
+                            <i class="fa-solid fa-location-dot text-indigo-400"></i>
+                            <span>قشم، درگهان، بازار قدیم، پشت بانک ملی، دالان ۸، پلاک ۵۳۳</span>
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <i class="fa-solid fa-phone text-indigo-400"></i>
+                            <a href="tel:09177692545" class="hover:underline font-bold">۰۹۱۷۷۶۹۲۵۴۵</a>
+                        </li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-bold text-sm mb-4 text-indigo-400">مدیریت و دسترسی‌ها</h4>
+                    <p class="text-xs text-slate-400 mb-3">حساب کاربری فعال با بالاترین سطح امنیت سیستم ثبت شده است.</p>
+                    <div id="footerUserRoleBadge" class="inline-block bg-slate-800 text-slate-300 px-3 py-1.5 rounded-xl text-xs font-semibold border border-slate-700">
+                        نقش: کاربر عادی
+                    </div>
+                </div>
+            </div>
+            <div class="max-w-7xl mx-auto border-t border-slate-800 pt-6 text-center text-xs text-slate-500">
+                تمامی حقوق محفوظ است © ۱۴۰۵ - فروشگاه کفش شهاب
+            </div>
+        </footer>
+    </div>
+
+    <!-- Product Detail Modal -->
+    <div id="productDetailModal" class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm hidden items-center justify-center p-4">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-2xl w-full overflow-hidden border border-slate-100 flex flex-col md:flex-row max-h-[90vh]">
+            <div class="md:w-1/2 bg-slate-100 relative min-h-[250px] md:min-h-full">
+                <img id="detailImage" src="" alt="محصول" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/600x600/f1f5f9/64748b?text=کفش+شهاب'">
+                <div id="detailBadge" class="absolute top-4 right-4"></div>
+            </div>
+            <div class="md:w-1/2 p-6 flex flex-col justify-between overflow-y-auto">
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <span id="detailCategory" class="bg-indigo-50 text-indigo-700 text-[11px] font-bold px-3 py-1 rounded-full"></span>
+                        <span id="detailDate" class="text-[11px] text-slate-400"></span>
+                    </div>
+                    <h3 id="detailName" class="text-xl font-black text-slate-900 mb-3 leading-tight"></h3>
+                    <div class="text-2xl font-black text-indigo-600 mb-4" id="detailPrice"></div>
+                    
+                    <h4 class="text-xs font-bold text-slate-700 mb-1">توضیحات محصول:</h4>
+                    <p id="detailDescription" class="text-xs text-slate-600 leading-relaxed mb-6 whitespace-pre-line bg-slate-50 p-3.5 rounded-2xl border border-slate-100"></p>
+
+                    <div class="bg-amber-50 border border-amber-200/60 p-3.5 rounded-2xl mb-4">
+                        <div class="flex items-center gap-2 text-amber-900 font-bold text-xs mb-1">
+                            <i class="fa-solid fa-headset text-amber-600"></i>
+                            <span>سفارش و استعلام قیمت عمده</span>
+                        </div>
+                        <p class="text-[11px] text-amber-700 mb-2">برای ثبت سفارش عمده کارتن یا خرده، با شماره زیر تماس بگیرید:</p>
+                        <a href="tel:09177692545" class="block text-center bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-2 rounded-xl text-xs transition-colors shadow">
+                            تماس با: ۰۹۱۷۷۶۹۲۵۴۵
+                        </a>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                    <button onclick="closeProductDetail()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl text-xs transition-colors">
+                        بستن
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Product Modal (Admin Only) -->
+    <div id="productModal" class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm hidden items-center justify-center p-4">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-6 border border-slate-100 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-6 border-b border-slate-100 pb-4">
+                <h3 id="modalTitle" class="text-lg font-black text-slate-900">افزودن محصول جدید</h3>
+                <button onclick="closeProductModal()" class="text-slate-400 hover:text-slate-600 p-2"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <form id="productForm" onsubmit="handleProductSubmit(event)" class="space-y-4">
+                <input type="hidden" id="productId">
+                
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">نام محصول</label>
+                    <input type="text" id="prodName" required placeholder="مثلاً: کتانی اسپرت بچه‌گانه مدل لایتینگ" 
+                        class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">قیمت (تومان)</label>
+                        <input type="number" id="prodPrice" required placeholder="380000" 
+                            class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600 text-left dir-ltr">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">دسته‌بندی</label>
+                        <select id="prodCategory" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600">
+                            <option value="بچه‌گانه">بچه‌گانه</option>
+                            <option value="اسپرت">اسپرت</option>
+                            <option value="مجلسی">مجلسی</option>
+                            <option value="زنانه">زنانه</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">انتخاب عکس از گالری</label>
+                    <div class="flex items-center gap-3">
+                        <label class="cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-4 py-2.5 rounded-xl text-xs transition-colors border border-slate-200 flex items-center gap-2">
+                            <i class="fa-solid fa-image"></i>
+                            <span>انتخاب تصویر از گالری</span>
+                            <input type="file" id="prodImageFile" accept="image/*" onchange="handleImageGallerySelect(event)" class="hidden">
+                        </label>
+                        <span id="imageFileName" class="text-xs text-slate-400">فایلی انتخاب نشده است</span>
+                    </div>
+                    <input type="hidden" id="prodImage" value="">
+                    <!-- Image Preview -->
+                    <div class="mt-3">
+                        <img id="imagePreview" src="" alt="پیش‌نمایش" class="w-24 h-24 object-cover rounded-xl border border-slate-200 hidden">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">وضعیت موجودی</label>
+                    <select id="prodStatus" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600">
+                        <option value="available">موجود در انبار</option>
+                        <option value="unavailable">ناموجود</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">توضیحات محصول</label>
+                    <textarea id="prodDesc" rows="3" placeholder="توضیحات کامل درباره جنس، سایزبندی، نحوه فروش عمده و..." 
+                        class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600"></textarea>
+                </div>
+
+                <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                    <button type="button" onclick="closeProductModal()" class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors">انصراف</button>
+                    <button type="submit" class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition-colors shadow-md">ذخیره محصول</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Call Support Modal -->
+    <div id="callModal" class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm hidden items-center justify-center p-4">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 text-center border border-slate-100">
+            <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4">
+                <i class="fa-solid fa-phone-volume"></i>
+            </div>
+            <h4 class="font-black text-lg text-slate-900 mb-1">تماس با فروشگاه کفش شهاب</h4>
+            <p class="text-xs text-slate-500 mb-6">جهت استعلام موجودی عمده، قیمت کارتن و هماهنگی ارسال:</p>
+            
+            <a href="tel:09177692545" class="block bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3 rounded-xl text-sm shadow-lg shadow-emerald-600/30 mb-3 transition-all">
+                ۰۹۱۷۷۶۹۲۵۴۵
+            </a>
+            
+            <button onclick="closeCallModal()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl text-xs transition-colors">
+                بازگشت
+            </button>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-6 left-6 z-50 transform translate-y-24 opacity-0 transition-all duration-300 bg-slate-900 text-white px-6 py-3.5 rounded-2xl shadow-2xl text-xs font-bold flex items-center gap-3 border border-slate-800">
+        <span id="toastIcon"></span>
+        <span id="toastMessage"></span>
+    </div>
+
+    <!-- App Logic Script -->
+    <script type="module">
+        import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        let currentCategory = 'all';
+        let selectedProductForDetail = null;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            checkStoredUser();
+        });
+
+        function checkStoredUser() {
+            const savedUser = localStorage.getItem('shahab_user');
+            if (savedUser) {
+                try {
+                    const user = JSON.parse(savedUser);
+                    window.ShahabApp.currentUser = user;
+                    window.ShahabApp.currentRole = window.ShahabApp.ADMIN_PHONES.includes(user.phone) ? 'admin' : 'user';
+                    
+                    document.getElementById('authModal').classList.add('hidden');
+                    document.getElementById('mainApp').classList.remove('hidden');
+                    document.getElementById('mainApp').classList.add('flex');
+                    
+                    updateUserUI();
+                    initFirestoreListener();
+                } catch (e) {
+                    localStorage.removeItem('shahab_user');
+                }
+            }
+        }
+
+        window.handleAuthSubmit = function(e) {
+            e.preventDefault();
+            const name = document.getElementById('authName').value.trim();
+            const phone = document.getElementById('authPhone').value.trim();
+
+            if (!/^09[0-9]{9}$/.test(phone)) {
+                showToast('شماره تلفن نامعتبر است. لطفاً شماره ۱۱ رقمی با 09 وارد کنید', 'error');
+                return;
+            }
+
+            const role = window.ShahabApp.ADMIN_PHONES.includes(phone) ? 'admin' : 'user';
+            const user = { name, phone, role, createdAt: new Date().toISOString() };
+
+            localStorage.setItem('shahab_user', JSON.stringify(user));
+            window.ShahabApp.currentUser = user;
+            window.ShahabApp.currentRole = role;
+
+            document.getElementById('authModal').classList.add('hidden');
+            document.getElementById('mainApp').classList.remove('hidden');
+            document.getElementById('mainApp').classList.add('flex');
+
+            updateUserUI();
+            initFirestoreListener();
+            showToast(`خوش آمدید، ${name}!`, 'success');
+        };
+
+        window.logoutUser = function() {
+            localStorage.removeItem('shahab_user');
+            window.location.reload();
+        };
+
+        function updateUserUI() {
+            const user = window.ShahabApp.currentUser;
+            if (!user) return;
+
+            document.getElementById('headerUserName').textContent = user.name;
+            const roleEl = document.getElementById('headerUserRole');
+            const footerRoleEl = document.getElementById('footerUserRoleBadge');
+            const adminBadgeContainer = document.getElementById('adminBadgeContainer');
+            const adminPanelSection = document.getElementById('adminPanelSection');
+
+            if (window.ShahabApp.currentRole === 'admin') {
+                roleEl.textContent = 'مدیر سیستم (Admin)';
+                footerRoleEl.textContent = 'نقش: مدیر سیستم (Admin)';
+                footerRoleEl.className = 'inline-block bg-indigo-900 text-indigo-200 px-3 py-1.5 rounded-xl text-xs font-semibold border border-indigo-700';
+                adminBadgeContainer.innerHTML = `<span class="bg-indigo-600 text-white text-[10px] font-extrabold px-3 py-1.5 rounded-xl shadow-sm"><i class="fa-solid fa-shield-halved ml-1"></i> ادمین</span>`;
+                adminPanelSection.classList.remove('hidden');
+            } else {
+                roleEl.textContent = 'مشتری گرامی';
+                footerRoleEl.textContent = 'نقش: کاربر عادی';
+                adminBadgeContainer.innerHTML = '';
+                adminPanelSection.classList.add('hidden');
+            }
+        }
+
+        function initFirestoreListener() {
+            const db = window.ShahabApp.db;
+            const appId = window.ShahabApp.appId;
+
+            if (!db) {
+                loadSampleProducts();
+                return;
+            }
+
+            try {
+                const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'products');
+                onSnapshot(colRef, (snapshot) => {
+                    const prods = [];
+                    snapshot.forEach(docSnap => {
+                        prods.push({ id: docSnap.id, ...docSnap.data() });
+                    });
+                    
+                    if (prods.length === 0) {
+                        seedInitialProducts();
+                    } else {
+                        window.ShahabApp.products = prods;
+                        renderProducts();
+                    }
+                }, (error) => {
+                    console.warn("Firestore listener error, fallback to samples:", error);
+                    loadSampleProducts();
+                });
+            } catch (err) {
+                console.warn("Firestore init error:", err);
+                loadSampleProducts();
+            }
+        }
+
+        async function seedInitialProducts() {
+            const sampleProducts = [
+                {
+                    name: 'کتانی اسپرت بچه‌گانه مدل لایتینگ (پخش عمده کارتن ۱۲ جفت)',
+                    price: 380000,
+                    category: 'بچه‌گانه',
+                    status: 'available',
+                    description: 'فروش ویژه عمده کفش بچه‌گانه اسپرت چراغ‌دار. سایزبندی ۲۱ تا ۲۶، کفی نرم و طبی، رویه تنفس‌پذیر مقاوم.',
+                    image: 'https://images.unsplash.com/photo-1514989940753-eaf05ce9ef05?auto=format&fit=crop&w=600&q=80',
+                    createdAt: new Date().toISOString()
+                },
+                {
+                    name: 'صندل مجلسی دخترانه پاستیلی (کارتن عمده ۱۰ جفت)',
+                    price: 320000,
+                    category: 'بچه‌گانه',
+                    status: 'available',
+                    description: 'مدل جدید صندل تابستانی دخترانه، رنگ‌بندی شاد و جذاب، کفی ضد لغزش مناسب فروشگاه‌های کفش.',
+                    image: 'https://images.unsplash.com/photo-1560769629-975ec94e6a86?auto=format&fit=crop&w=600&q=80',
+                    createdAt: new Date().toISOString()
+                },
+                {
+                    name: 'کفش اسپرت پسرانه مدل نایک ایرمکس بچه‌گانه',
+                    price: 420000,
+                    category: 'بچه‌گانه',
+                    status: 'available',
+                    description: 'کارتن ۱۲ عددی سایز ۲۷ تا ۳۲، بسیار باکیفیت و شیک، دوخت تمیز و زیره پی‌یو سبک.',
+                    image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=600&q=80',
+                    createdAt: new Date().toISOString()
+                },
+                {
+                    name: 'کفش اسپرت مردانه نایک مدل Air Max',
+                    price: 1850000,
+                    category: 'اسپرت',
+                    status: 'available',
+                    description: 'کفش اسپرت بسیار راحت مناسب پیاده‌روی طولانی مدت و باشگاه. کفی طبی و رویه تنفس‌پذیر.',
+                    image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=600&q=80',
+                    createdAt: new Date().toISOString()
+                },
+                {
+                    name: 'کفش رسمی مردانه چرم طبیعی مدل کلاسیک',
+                    price: 2400000,
+                    category: 'مجلسی',
+                    status: 'available',
+                    description: 'ساخته شده از چرم طبیعی گاوی با دوخت دستی و زیره مقاوم در برابر سایش. شیک و رسمی.',
+                    image: 'https://images.unsplash.com/photo-1614252235316-8c857d38b5f4?auto=format&fit=crop&w=600&q=80',
+                    createdAt: new Date().toISOString()
+                },
+                {
+                    name: 'کفش رانینگ زنانه آدیداس مدل Ultraboost',
+                    price: 1950000,
+                    category: 'زنانه',
+                    status: 'available',
+                    description: 'طراحی مدرن، سبک و با قابلیت ارتجاعی بالا جهت کاهش فشار به زانوها در هنگام دویدن.',
+                    image: 'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&w=600&q=80',
+                    createdAt: new Date().toISOString()
+                }
+            ];
+
+            const db = window.ShahabApp.db;
+            const appId = window.ShahabApp.appId;
+            if (db) {
+                try {
+                    for (let p of sampleProducts) {
+                        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), p);
+                    }
+                    return;
+                } catch (e) {
+                    console.warn("Seeding error:", e);
+                }
+            }
+            loadSampleProducts();
+        }
+
+        function loadSampleProducts() {
+            window.ShahabApp.products = [
+                {
+                    id: 'mock_1',
+                    name: 'کتانی اسپرت بچه‌گانه مدل لایتینگ (پخش عمده)',
+                    price: 380000,
+                    category: 'بچه‌گانه',
+                    status: 'available',
+                    description: 'فروش ویژه عمده کفش بچه‌گانه اسپرت چراغ‌دار. سایزبندی ۲۱ تا ۲۶، کفی نرم و طبی.',
+                    image: 'https://images.unsplash.com/photo-1514989940753-eaf05ce9ef05?auto=format&fit=crop&w=600&q=80',
+                    createdAt: new Date().toISOString()
+                },
+                {
+                    id: 'mock_2',
+                    name: 'صندل مجلسی دخترانه پاستیلی',
+                    price: 320000,
+                    category: 'بچه‌گانه',
+                    status: 'available',
+                    description: 'مدل جدید صندل تابستانی دخترانه، رنگ‌بندی شاد و جذاب، کفی ضد لغزش.',
+                    image: 'https://images.unsplash.com/photo-1560769629-975ec94e6a86?auto=format&fit=crop&w=600&q=80',
+                    createdAt: new Date().toISOString()
+                },
+                {
+                    id: 'mock_3',
+                    name: 'کفش اسپرت مردانه نایک مدل Air Max',
+                    price: 1850000,
+                    category: 'اسپرت',
+                    status: 'available',
+                    description: 'کفش اسپرت بسیار راحت مناسب پیاده‌روی طولانی مدت و باشگاه.',
+                    image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=600&q=80',
+                    createdAt: new Date().toISOString()
+                },
+                {
+                    id: 'mock_4',
+                    name: 'کفش رسمی مردانه چرم طبیعی',
+                    price: 2400000,
+                    category: 'مجلسی',
+                    status: 'unavailable',
+                    description: 'ساخته شده از چرم طبیعی گاوی با دوخت دستی و زیره مقاوم در برابر سایش.',
+                    image: 'https://images.unsplash.com/photo-1614252235316-8c857d38b5f4?auto=format&fit=crop&w=600&q=80',
+                    createdAt: new Date().toISOString()
+                }
+            ];
+            renderProducts();
+        }
+
+        window.filterByCategory = function(cat) {
+            currentCategory = cat;
+            document.querySelectorAll('.category-btn').forEach(btn => {
+                btn.className = 'category-btn bg-white text-slate-600 hover:bg-slate-100 text-xs font-bold px-4 py-2.5 rounded-xl border border-slate-200 transition-all whitespace-nowrap';
+            });
+            const activeBtn = document.getElementById(`cat_${cat}`);
+            if (activeBtn) {
+                activeBtn.className = 'category-btn bg-indigo-600 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-sm transition-all whitespace-nowrap';
+            }
+            renderProducts();
+        };
+
+        window.filterProducts = function() {
+            renderProducts();
+        };
+
+        window.renderProducts = function() {
+            const query = document.getElementById('searchInput').value.toLowerCase().trim();
+            const grid = document.getElementById('productsGrid');
+            const emptyState = document.getElementById('emptyState');
+
+            const filtered = window.ShahabApp.products.filter(p => {
+                const matchesCat = currentCategory === 'all' || p.category === currentCategory;
+                const matchesQuery = p.name.toLowerCase().includes(query) || (p.description && p.description.toLowerCase().includes(query));
+                return matchesCat && matchesQuery;
+            });
+
+            if (filtered.length === 0) {
+                grid.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            const isAdmin = window.ShahabApp.currentRole === 'admin';
+
+            grid.innerHTML = filtered.map(p => {
+                const isAvailable = p.status === 'available';
+                const statusBadge = isAvailable 
+                    ? `<span class="bg-emerald-500 text-white text-[10px] font-extrabold px-3 py-1 rounded-full shadow-sm"><i class="fa-solid fa-check ml-1"></i> موجود</span>`
+                    : `<span class="bg-rose-500 text-white text-[10px] font-extrabold px-3 py-1 rounded-full shadow-sm"><i class="fa-solid fa-ban ml-1"></i> ناموجود</span>`;
+                
+                const adminActions = isAdmin ? `
+                    <div class="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between gap-2">
+                        <button onclick="toggleStock('${p.id}', '${p.status}')" class="flex-1 text-xs font-bold py-2 rounded-xl transition-colors ${isAvailable ? 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'}">
+                            ${isAvailable ? 'تغییر به ناموجود' : 'تغییر به موجود'}
+                        </button>
+                        <button onclick="editProduct('${p.id}')" class="bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-700 p-2 rounded-xl transition-colors" title="ویرایش محصول">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
+                        <button onclick="deleteProduct('${p.id}')" class="bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-700 p-2 rounded-xl transition-colors" title="حذف محصول">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
+                ` : '';
+
+                return `
+                    <div class="bg-white rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col group">
+                        <div class="relative h-56 bg-slate-100 overflow-hidden cursor-pointer" onclick="openProductDetail('${p.id}')">
+                            <img src="${p.image || 'https://placehold.co/600x600/f1f5f9/64748b?text=کفش+شهاب'}" alt="${p.name}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" onerror="this.src='https://placehold.co/600x600/f1f5f9/64748b?text=کفش+شهاب'">
+                            <div class="absolute top-3 right-3">${statusBadge}</div>
+                            <div class="absolute top-3 left-3 bg-white/90 backdrop-blur-md text-slate-800 text-[11px] font-extrabold px-3 py-1 rounded-xl shadow-sm">
+                                ${p.category}
+                            </div>
+                        </div>
+
+                        <div class="p-5 flex flex-col flex-grow justify-between">
+                            <div>
+                                <h4 onclick="openProductDetail('${p.id}')" class="font-extrabold text-slate-900 text-base mb-2 line-clamp-1 hover:text-indigo-600 cursor-pointer transition-colors">${p.name}</h4>
+                                <p class="text-xs text-slate-500 line-clamp-2 mb-4 leading-relaxed">${p.description || 'بدون توضیحات'}</p>
+                            </div>
+
+                            <div>
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-xs text-slate-400 font-semibold">قیمت واحد:</span>
+                                    <span class="text-lg font-black text-indigo-600">${Number(p.price).toLocaleString()} <span class="text-xs font-normal text-slate-500">تومان</span></span>
+                                </div>
+
+                                <button onclick="openProductDetail('${p.id}')" class="w-full bg-slate-100 hover:bg-indigo-600 hover:text-white text-slate-700 font-bold py-2.5 rounded-xl text-xs transition-all flex items-center justify-center gap-2">
+                                    <span>مشاهده جزئیات و استعلام</span>
+                                    <i class="fa-solid fa-arrow-left"></i>
+                                </button>
+
+                                ${adminActions}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        };
+
+        // Gallery Image Selector Handler
+        window.handleImageGallerySelect = function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            document.getElementById('imageFileName').textContent = file.name;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const base64String = e.target.result;
+                document.getElementById('prodImage').value = base64String;
+                const preview = document.getElementById('imagePreview');
+                preview.src = base64String;
+                preview.classList.remove('hidden');
+            };
+            reader.readAsDataURL(file);
+        };
+
+        window.openProductModal = function(productId = null) {
+            if (window.ShahabApp.currentRole !== 'admin') {
+                showToast('شما دسترسی ادمین ندارید', 'error');
+                return;
+            }
+
+            const modal = document.getElementById('productModal');
+            const title = document.getElementById('modalTitle');
+            const form = document.getElementById('productForm');
+            form.reset();
+            document.getElementById('productId').value = '';
+            document.getElementById('imageFileName').textContent = 'فایلی انتخاب نشده است';
+            document.getElementById('imagePreview').classList.add('hidden');
+            document.getElementById('imagePreview').src = '';
+            document.getElementById('prodImage').value = '';
+
+            if (productId) {
+                title.textContent = 'ویرایش محصول';
+                const p = window.ShahabApp.products.find(item => item.id === productId);
+                if (p) {
+                    document.getElementById('productId').value = p.id;
+                    document.getElementById('prodName').value = p.name;
+                    document.getElementById('prodPrice').value = p.price;
+                    document.getElementById('prodCategory').value = p.category;
+                    document.getElementById('prodStatus').value = p.status;
+                    document.getElementById('prodDesc').value = p.description || '';
+                    document.getElementById('prodImage').value = p.image || '';
+                    if (p.image) {
+                        document.getElementById('imagePreview').src = p.image;
+                        document.getElementById('imagePreview').classList.remove('hidden');
+                        document.getElementById('imageFileName').textContent = 'تصویر فعلی بارگذاری شده';
+                    }
+                }
+            } else {
+                title.textContent = 'افزودن محصول جدید';
+            }
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        };
+
+        window.closeProductModal = function() {
+            document.getElementById('productModal').classList.add('hidden');
+            document.getElementById('productModal').classList.remove('flex');
+        };
+
+        window.handleProductSubmit = async function(e) {
+            e.preventDefault();
+            if (window.ShahabApp.currentRole !== 'admin') return;
+
+            const id = document.getElementById('productId').value;
+            const name = document.getElementById('prodName').value.trim();
+            const price = Number(document.getElementById('prodPrice').value);
+            const category = document.getElementById('prodCategory').value;
+            const status = document.getElementById('prodStatus').value;
+            const description = document.getElementById('prodDesc').value.trim();
+            const image = document.getElementById('prodImage').value || 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=600&q=80';
+
+            const productData = {
+                name,
+                price,
+                category,
+                status,
+                description,
+                image,
+                updatedAt: new Date().toISOString()
+            };
+
+            const db = window.ShahabApp.db;
+            const appId = window.ShahabApp.appId;
+
+            try {
+                if (id && db) {
+                    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', id), productData);
+                    showToast('محصول با موفقیت ویرایش شد', 'success');
+                } else if (db) {
+                    productData.createdAt = new Date().toISOString();
+                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), productData);
+                    showToast('محصول جدید با موفقیت اضافه شد', 'success');
+                } else {
+                    // Local fallback
+                    if (id) {
+                        const idx = window.ShahabApp.products.findIndex(p => p.id === id);
+                        if (idx !== -1) window.ShahabApp.products[idx] = { id, ...productData };
+                    } else {
+                        window.ShahabApp.products.push({ id: 'local_' + Date.now(), ...productData });
+                    }
+                    renderProducts();
+                    showToast('تغییرات ذخیره شد', 'success');
+                }
+                closeProductModal();
+            } catch (err) {
+                console.error("Save product error:", err);
+                showToast('خطا در ذخیره محصول', 'error');
+            }
+        };
+
+        window.editProduct = function(id) {
+            openProductModal(id);
+        };
+
+        window.toggleStock = async function(id, currentStatus) {
+            if (window.ShahabApp.currentRole !== 'admin') return;
+            const newStatus = currentStatus === 'available' ? 'unavailable' : 'available';
+            const db = window.ShahabApp.db;
+            const appId = window.ShahabApp.appId;
+
+            try {
+                if (db) {
+                    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', id), {
+                        status: newStatus,
+                        updatedAt: new Date().toISOString()
+                    });
+                    showToast('وضعیت موجودی محصول تغییر کرد', 'success');
+                } else {
+                    const p = window.ShahabApp.products.find(item => item.id === id);
+                    if (p) p.status = newStatus;
+                    renderProducts();
+                    showToast('وضعیت موجودی محصول تغییر کرد', 'success');
+                }
+            } catch (err) {
+                console.error("Stock toggle error:", err);
+                showToast('خطا در تغییر وضعیت', 'error');
+            }
+        };
+
+        window.deleteProduct = async function(id) {
+            if (window.ShahabApp.currentRole !== 'admin') return;
+            if (!confirm('آیا از حذف این محصول اطمینان دارید؟')) return;
+
+            const db = window.ShahabApp.db;
+            const appId = window.ShahabApp.appId;
+
+            try {
+                if (db) {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', id));
+                    showToast('محصول با موفقیت حذف شد', 'success');
+                } else {
+                    window.ShahabApp.products = window.ShahabApp.products.filter(p => p.id !== id);
+                    renderProducts();
+                    showToast('محصول با موفقیت حذف شد', 'success');
+                }
+            } catch (err) {
+                console.error("Delete product error:", err);
+                showToast('خطا در حذف محصول', 'error');
+            }
+        };
+
+        window.openProductDetail = function(id) {
+            const p = window.ShahabApp.products.find(item => item.id === id);
+            if (!p) return;
+
+            document.getElementById('detailImage').src = p.image || 'https://placehold.co/600x600/f1f5f9/64748b?text=کفش+شهاب';
+            document.getElementById('detailCategory').textContent = p.category;
+            document.getElementById('detailName').textContent = p.name;
+            document.getElementById('detailPrice').innerHTML = `${Number(p.price).toLocaleString()} <span class="text-xs font-normal text-slate-500">تومان</span>`;
+            document.getElementById('detailDescription').textContent = p.description || 'توضیحاتی برای این محصول ثبت نشده است.';
+            
+            const isAvailable = p.status === 'available';
+            document.getElementById('detailBadge').innerHTML = isAvailable
+                ? `<span class="bg-emerald-500 text-white text-xs font-extrabold px-3 py-1.5 rounded-full shadow-md"><i class="fa-solid fa-check ml-1"></i> موجود در انبار</span>`
+                : `<span class="bg-rose-500 text-white text-xs font-extrabold px-3 py-1.5 rounded-full shadow-md"><i class="fa-solid fa-ban ml-1"></i> ناموجود</span>`;
+
+            if (p.createdAt) {
+                const d = new Date(p.createdAt);
+                document.getElementById('detailDate').textContent = `تاریخ ثبت: ${d.toLocaleDateString('fa-IR')}`;
+            } else {
+                document.getElementById('detailDate').textContent = '';
+            }
+
+            const modal = document.getElementById('productDetailModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        };
+
+        window.closeProductDetail = function() {
+            document.getElementById('productDetailModal').classList.add('hidden');
+            document.getElementById('productDetailModal').classList.remove('flex');
+        };
+
+        window.openCallModal = function() {
+            const modal = document.getElementById('callModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        };
+
+        window.closeCallModal = function() {
+            document.getElementById('callModal').classList.add('hidden');
+            document.getElementById('callModal').classList.remove('flex');
+        };
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toastIcon');
+            const msg = document.getElementById('toastMessage');
+
+            msg.textContent = message;
+            if (type === 'success') {
+                icon.innerHTML = '<i class="fa-solid fa-circle-check text-emerald-400 text-base"></i>';
+                toast.className = 'fixed bottom-6 left-6 z-50 transform translate-y-0 opacity-100 transition-all duration-300 bg-slate-900 text-white px-6 py-3.5 rounded-2xl shadow-2xl text-xs font-bold flex items-center gap-3 border border-slate-800';
+            } else {
+                icon.innerHTML = '<i class="fa-solid fa-circle-exclamation text-rose-400 text-base"></i>';
+                toast.className = 'fixed bottom-6 left-6 z-50 transform translate-y-0 opacity-100 transition-all duration-300 bg-slate-900 text-white px-6 py-3.5 rounded-2xl shadow-2xl text-xs font-bold flex items-center gap-3 border border-rose-900';
+            }
+
+            setTimeout(() => {
+                toast.className = 'fixed bottom-6 left-6 z-50 transform translate-y-24 opacity-0 transition-all duration-300 bg-slate-900 text-white px-6 py-3.5 rounded-2xl shadow-2xl text-xs font-bold flex items-center gap-3 border border-slate-800';
+            }, 3500);
+        }
+    </script>
+</body>
+</html>
